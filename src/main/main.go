@@ -10,31 +10,37 @@ import (
 	"github.com/labstack/echo"
 )
 
-func hello(c echo.Context) error {
-	return c.String(http.StatusOK, "hello!")
-}
-
-type Book struct {
+type BookshelfBook struct {
 	Title       string `json:"title"`
 	PublishedAt string `json:"publishedAt"`
 }
 
-func listBooks(c echo.Context) error {
-	bookTitle := c.QueryParam("title")
-	bookPublishedAt := c.QueryParam("published-at")
+type BookshelfRepository struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+}
+
+type BookshelfResearchPaper struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+}
+
+func listBookshelfBooks(c echo.Context) error {
+	title := c.QueryParam("title")
+	publishedAt := c.QueryParam("published-at")
 
 	dataType := c.Param("data")
 
 	if dataType == "string" {
 		return c.String(http.StatusOK, fmt.Sprintf(
-			"The book title is %s\nThe book is published at %s", bookTitle, bookPublishedAt,
+			"The book title is %s\nThe book is published at %s", title, publishedAt,
 		))
 	}
 
 	if dataType == "json" {
 		return c.JSON(http.StatusOK, map[string]string{
-			"title":       bookTitle,
-			"publishedAt": bookPublishedAt,
+			"title":       title,
+			"publishedAt": publishedAt,
 		})
 	}
 
@@ -43,9 +49,8 @@ func listBooks(c echo.Context) error {
 	})
 }
 
-func createBook(c echo.Context) error {
-
-	book := Book{}
+func createBookshelfBook(c echo.Context) error {
+	book := BookshelfBook{}
 
 	defer c.Request().Body.Close()
 
@@ -63,9 +68,42 @@ func createBook(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, "")
 	}
 
-	log.Printf("this is your book: ")
+	log.Printf("this is your book: %#v", book)
 
 	return c.String(http.StatusOK, "book created")
+}
+
+func createBookshelfRepository(c echo.Context) error {
+	repository := BookshelfRepository{}
+
+	defer c.Request().Body.Close()
+
+	err := json.NewDecoder(c.Request().Body).Decode(&repository)
+
+	if err != nil {
+		log.Printf("failed to read the request body: %s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "")
+	}
+
+	log.Printf("this is your repository: %#v", repository)
+
+	return c.String(http.StatusOK, "repository created")
+}
+
+func createBookshelfResearchPaper(c echo.Context) error {
+	researchPaper := BookshelfResearchPaper{}
+
+	err := c.Bind(&researchPaper)
+
+	if err != nil {
+		log.Printf("failed to read the request body: %s", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "")
+	}
+
+	log.Printf("this is your research paper: %#v", researchPaper)
+
+	return c.String(http.StatusOK, "research paper created")
+
 }
 
 func main() {
@@ -73,10 +111,11 @@ func main() {
 
 	e := echo.New()
 
-	e.GET("/", hello)
-	e.GET("/books/:data", listBooks)
+	e.GET("/bookshelfBooks/:data", listBookshelfBooks)
 
-	e.POST("/books", createBook)
+	e.POST("/bookshelfBook", createBookshelfBook)
+	e.POST("/bookshelfRepository", createBookshelfRepository)
+	e.POST("/bookshelfResearchPaper", createBookshelfResearchPaper)
 
 	e.Start(":8000")
 }
