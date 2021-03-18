@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -9,6 +12,11 @@ import (
 
 func hello(c echo.Context) error {
 	return c.String(http.StatusOK, "hello!")
+}
+
+type Book struct {
+	Title       string `json:"title"`
+	PublishedAt string `json:"publishedAt"`
 }
 
 func listBooks(c echo.Context) error {
@@ -35,6 +43,31 @@ func listBooks(c echo.Context) error {
 	})
 }
 
+func createBook(c echo.Context) error {
+
+	book := Book{}
+
+	defer c.Request().Body.Close()
+
+	body, err := ioutil.ReadAll(c.Request().Body)
+
+	if err != nil {
+		log.Printf("failed to read the request body: %s", err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	err = json.Unmarshal(body, &book)
+
+	if err != nil {
+		log.Printf("failed unmarshalling createBook: %s", err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	log.Printf("this is your book: ")
+
+	return c.String(http.StatusOK, "book created")
+}
+
 func main() {
 	fmt.Println("Server started:")
 
@@ -42,6 +75,8 @@ func main() {
 
 	e.GET("/", hello)
 	e.GET("/books/:data", listBooks)
+
+	e.POST("/books", createBook)
 
 	e.Start(":8000")
 }
