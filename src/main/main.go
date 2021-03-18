@@ -15,14 +15,24 @@ func listBooks(c echo.Context) error {
 	bookTitle := c.QueryParam("title")
 	bookPublishedAt := c.QueryParam("published-at")
 
-	return c.String(http.StatusOK, fmt.Sprintf(
-		"The book title is %s\nThe book is published at %s", bookTitle, bookPublishedAt,
-	))
+	dataType := c.Param("data")
 
-	// http://localhost:8000/books?title=title&published-at=published-at
+	if dataType == "string" {
+		return c.String(http.StatusOK, fmt.Sprintf(
+			"The book title is %s\nThe book is published at %s", bookTitle, bookPublishedAt,
+		))
+	}
 
-	// The book title is title
-	// The book is published at published-at
+	if dataType == "json" {
+		return c.JSON(http.StatusOK, map[string]string{
+			"title":       bookTitle,
+			"publishedAt": bookPublishedAt,
+		})
+	}
+
+	return c.JSON(http.StatusBadRequest, map[string]string{
+		"error": "you need to let us know if you want json or string data",
+	})
 }
 
 func main() {
@@ -31,7 +41,7 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", hello)
-	e.GET("/books", listBooks)
+	e.GET("/books/:data", listBooks)
 
 	e.Start(":8000")
 }
