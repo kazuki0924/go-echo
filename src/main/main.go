@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo"
+	"github.com/labstack/echo/middleware"
 )
 
 type BookshelfBook struct {
@@ -106,10 +107,22 @@ func createBookshelfResearchPaper(c echo.Context) error {
 
 }
 
+func mainAdmin(c echo.Context) error {
+	return c.String(http.StatusOK, "admin main page")
+}
+
 func main() {
 	fmt.Println("Server started:")
 
 	e := echo.New()
+
+	g := e.Group("/admin")
+
+	g.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: `[${time_rfc3339}] ${status} ${method} ${host}${path} ${latency_human}` + "\n",
+	}))
+
+	g.GET("/main", mainAdmin)
 
 	e.GET("/bookshelfBooks/:data", listBookshelfBooks)
 
