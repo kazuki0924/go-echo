@@ -111,15 +111,34 @@ func mainAdmin(c echo.Context) error {
 	return c.String(http.StatusOK, "admin main page")
 }
 
+// middlewares
+func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		c.Response().Header().Set(echo.HeaderServer, "TestServer/1.0")
+
+		return next(c)
+	}
+}
+
 func main() {
 	fmt.Println("Server started:")
 
 	e := echo.New()
 
+	e.Use(ServerHeader)
+
 	g := e.Group("/admin")
 
 	g.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `[${time_rfc3339}] ${status} ${method} ${host}${path} ${latency_human}` + "\n",
+	}))
+
+	g.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+		if username == "username" && password == "password" {
+			return true, nil
+		}
+
+		return false, nil
 	}))
 
 	g.GET("/main", mainAdmin)
