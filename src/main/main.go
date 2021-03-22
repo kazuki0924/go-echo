@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
@@ -111,12 +113,54 @@ func mainAdmin(c echo.Context) error {
 	return c.String(http.StatusOK, "admin main page")
 }
 
+func mainCookie(c echo.Context) error {
+	return c.String(http.StatusOK, "cookie")
+}
+
+func login(c echo.Context) error {
+	username := c.QueryParam("username")
+	password := c.QueryParam("password")
+
+	if username == "username" && password == "password" {
+		cookie := &http.Cookie{} // new(http.)
+
+		cookie.Name = "sessionID"
+		cookie.Value = "secret"
+		cookie.Expires = time.Now().Add(24 * 2 * time.Hour)
+
+		c.SetCookie(cookie)
+
+		return c.String(http.StatusOK, "you are logged in")
+	}
+
+	return c.String(http.StatusUnauthorized, "your username or password is wrong")
+}
+
 // middlewares
 func ServerHeader(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		c.Response().Header().Set(echo.HeaderServer, "TestServer/1.0")
 
 		return next(c)
+	}
+}
+
+func checkCookie(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		cookie, err := c.Cookie("sessionID")
+
+		if err != nil {
+			if strings.Contains(err.Error(), "named cookie not present") {
+				return c.String(http.StatusUnauthorized, "you don't have any cookie")
+			}
+			return err
+		}
+
+		if cookie.Value == "secret" {
+			return next(c)
+		}
+
+		return c.String(http.StatusUnauthorized, "you don't have the right cookie")
 	}
 }
 
@@ -127,13 +171,14 @@ func main() {
 
 	e.Use(ServerHeader)
 
-	g := e.Group("/admin")
+	cookieGroup := e.Group("/cookie")
+	adminGroup := e.Group("/admin")
 
-	g.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+	adminGroup.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `[${time_rfc3339}] ${status} ${method} ${host}${path} ${latency_human}` + "\n",
 	}))
 
-	g.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
+	adminGroup.Use(middleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
 		if username == "username" && password == "password" {
 			return true, nil
 		}
@@ -141,8 +186,11 @@ func main() {
 		return false, nil
 	}))
 
-	g.GET("/main", mainAdmin)
+	cookieGroup.Use(checkCookie)
+	cookieGroup.GET("/main", mainCookie)
+	adminGroup.GET("/main", mainAdmin)
 
+	e.GET("/login", login)
 	e.GET("/bookshelfBooks/:data", listBookshelfBooks)
 
 	e.POST("/bookshelfBook", createBookshelfBook)
