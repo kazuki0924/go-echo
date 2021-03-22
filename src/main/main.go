@@ -230,7 +230,9 @@ func main() {
 	adminGroup := e.Group("/admin")
 	jwtGroup := e.Group("/jwt")
 
-	// e.Use(middleware.Static("../static"))
+	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		Root: "./static",
+	}))
 
 	adminGroup.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `[${time_rfc3339}] ${status} ${method} ${host}${path} ${latency_human}` + "\n",
