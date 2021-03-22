@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 )
@@ -26,6 +27,11 @@ type BookshelfRepository struct {
 type BookshelfResearchPaper struct {
 	Title string `json:"title"`
 	Url   string `json:"url"`
+}
+
+type JwtClaims struct {
+	Name string `json:"name"`
+	jwt.StandardClaims
 }
 
 func listBookshelfBooks(c echo.Context) error {
@@ -130,10 +136,59 @@ func login(c echo.Context) error {
 
 		c.SetCookie(cookie)
 
-		return c.String(http.StatusOK, "you are logged in")
+		// return c.String(http.StatusOK, "you are logged in")
+		// create jwt token
+		token, err := createJwtToken()
+		if err != nil {
+			log.Println("Error Creating JWT token", err)
+			return c.String(http.StatusInternalServerError, "something went wrong")
+		}
+
+		jwtCookie := &http.Cookie{}
+
+		jwtCookie.Name = "JWTCookie"
+		jwtCookie.Value = token
+		jwtCookie.Expires = time.Now().Add(24 * 2 * time.Hour)
+
+		c.SetCookie(jwtCookie)
+
+		return c.JSON(http.StatusOK, map[string]string{
+			"message": "You were logged in!",
+			"token":   token,
+		})
 	}
 
 	return c.String(http.StatusUnauthorized, "your username or password is wrong")
+}
+
+func createJwtToken() (string, error) {
+	claims := JwtClaims{
+		"user",
+		jwt.StandardClaims{
+			Id:        "main_user_id",
+			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+		},
+	}
+
+	rawToken := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+
+	token, err := rawToken.SignedString([]byte("mySecret"))
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func mainJwt(c echo.Context) error {
+	user := c.Get("user")
+	token := user.(*jwt.Token)
+
+	claims := token.Claims.(jwt.MapClaims)
+
+	log.Println("User Name: ", claims["name"], "User ID: ", claims["jti"])
+
+	return c.String(http.StatusOK, "jwt")
 }
 
 // middlewares
@@ -173,6 +228,9 @@ func main() {
 
 	cookieGroup := e.Group("/cookie")
 	adminGroup := e.Group("/admin")
+	jwtGroup := e.Group("/jwt")
+
+	// e.Use(middleware.Static("../static"))
 
 	adminGroup.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `[${time_rfc3339}] ${status} ${method} ${host}${path} ${latency_human}` + "\n",
@@ -187,8 +245,15 @@ func main() {
 	}))
 
 	cookieGroup.Use(checkCookie)
+
+	jwtGroup.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+		SigningMethod: "HS512",
+		SigningKey:    []byte("mySecret"),
+	}))
+
 	cookieGroup.GET("/main", mainCookie)
 	adminGroup.GET("/main", mainAdmin)
+	jwtGroup.GET("/main", mainJwt)
 
 	e.GET("/login", login)
 	e.GET("/bookshelfBooks/:data", listBookshelfBooks)
